@@ -108,6 +108,7 @@ $labels['C'] = array();
 $labels['P'] = array();
 $labels['R'] = array();
 $labels['S'] = array();
+$labels['M'] = array();
 
 if (!$skip_labels) {
 	// Export all "labels"
@@ -133,7 +134,10 @@ if (!$skip_labels) {
 				FROM ticket WHERE COALESCE(resolution, '') <> ''
 	                        UNION
 	                        SELECT DISTINCT 'S' AS label_type, severity AS name, 'ff55ff' AS color
-				FROM ticket WHERE COALESCE(severity, '') <> ''");
+				FROM ticket WHERE COALESCE(severity, '') <> ''
+	                        UNION
+	                        SELECT DISTINCT 'M' AS label_type, milestone AS name, '880000' AS color
+				FROM ticket WHERE COALESCE(milestone, '') <> ''");
 
 	$existing_labels = array();
 	foreach (github_get_labels() as $l) {
@@ -213,7 +217,7 @@ if (!$skip_tickets) {
 		}
 		if (!$skip_comments) {
 			// restore original values (at ticket creation time), to restore modification history later
-			foreach ( array('owner', 'priority', 'resolution', 'milestone', 'type', 'component', 'description', 'summary') as $f ) {
+			foreach ( array('owner', 'priority', 'resolution', 'severity', 'milestone', 'type', 'component', 'description', 'summary') as $f ) {
 				$row[$f] = trac_orig_value($row, $f);
 			}
 		}
@@ -235,6 +239,9 @@ if (!$skip_tickets) {
 		}
 		if (!empty($labels['S'][crc32($row['severity'])])) {
 			$ticketLabels[] = $labels['S'][crc32($row['severity'])];
+		}
+		if (!empty($labels['M'][crc32($row['milestone'])])) {
+			$ticketLabels[] = $labels['M'][crc32($row['milestone'])];
 		}
 
 		$body = make_body($row['description']);
@@ -323,7 +330,7 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 				$text = '**Modified by ' . $row['author'] . ' on ' . $timestamp . "**";
 			}
 			$resp = github_add_comment($tickets[$row['ticket']], translate_markup($text));
-		} else if (in_array($row['field'], array('component', 'priority', 'type', 'resolution') )) {
+		} else if (in_array($row['field'], array('component', 'priority', 'type', 'resolution', 'severity') )) {
 			if (in_array($labels[strtoupper($row['field'])[0]][crc32($row['oldvalue'])], $ticketLabels)) {
 				$index = array_search($labels[strtoupper($row['field'])[0]][crc32($row['oldvalue'])], $ticketLabels);
 				$ticketLabels[$index] = $labels[strtoupper($row['field'])[0]][crc32($row['newvalue'])];
