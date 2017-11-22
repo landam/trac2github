@@ -254,7 +254,7 @@ if (!$skip_tickets) {
 		$resp = github_add_issue(array(
 			'title' => $row['summary'],
 			'body' => body_with_possible_suffix($body, $row['id']),
-			'assignee' => $assignee,
+			// 'assignee' => $assignee,
 			'milestone' => $milestone,
 			'labels' => $ticketLabels
 		));
@@ -356,8 +356,8 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 			} else {
 				$assignee = NULL;
 			}
-			$resp = github_update_issue($tickets[$ticket], array(
-						'assignee' => $assignee
+			// $resp = github_update_issue($tickets[$ticket], array(
+			// 			'assignee' => $assignee
 						));
 		} else if ($row['field'] == 'milestone') {
 			if (empty($row['newvalue'])) {
