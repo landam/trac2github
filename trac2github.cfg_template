@@ -8,10 +8,16 @@
  * @license BSD
  */
 
+// GitHub username
 $username   = 'Put your github username here';
+// GitHub password or personal access token (see https://help.github.com/articles/creating-a-personal-access-token-for-the-command-line/ )
 $password   = 'Put your github password here';
+// GitHub organization or personal site
 $project    = 'Organization or User name';
-$repo       = 'Organization or User name';
+// GitHub repository
+$repo       = 'GitHub repository';
+// Email address added to API requests (in case GitHub needs to contact you)
+$user_email = 'Put your email address here';
 
 // All users must be valid github logins!
 $users_list = array(
@@ -50,6 +56,11 @@ $skip_milestones = false;
 // Do not convert labels at this run
 $skip_labels = false;
 
+// Mapping from field names to GitHub labels
+// T: type
+// C: component
+// P: priority
+// R: resolution
 $remap_labels = array(
 	'T: defect' => 'bug',
 	'T: feature' => 'enhancement',
