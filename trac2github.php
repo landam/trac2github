@@ -107,6 +107,7 @@ $labels['T'] = array();
 $labels['C'] = array();
 $labels['P'] = array();
 $labels['R'] = array();
+$labels['S'] = array();
 
 if (!$skip_labels) {
 	// Export all "labels"
@@ -129,11 +130,17 @@ if (!$skip_labels) {
 	                        FROM ticket WHERE COALESCE(priority, '')   <> ''
 	                        UNION
 	                        SELECT DISTINCT 'R' AS label_type, resolution AS name, '55ff55' AS color
-	                        FROM ticket WHERE COALESCE(resolution, '') <> ''");
+				FROM ticket WHERE COALESCE(resolution, '') <> ''
+	                        UNION
+	                        SELECT DISTINCT 'S' AS label_type, severity AS name, 'ff55ff' AS color
+				FROM ticket WHERE COALESCE(severity, '') <> ''");
 
 	$existing_labels = array();
 	foreach (github_get_labels() as $l) {
 		$existing_labels[] = urldecode($l['name']);
+		if ($verbose) {
+			echo "found GitHub label {$l['name']}\n";
+		}
 	}
 	foreach ($res->fetchAll() as $row) {
 		$label_name = $row['label_type'] . ': ' . str_replace(",", "", $row['name']);
@@ -161,7 +168,7 @@ if (!$skip_labels) {
 		} else {
 			// Error
 			$error = print_r($resp, 1);
-			echo "Failed to convert label {$row['name']}: $error\n";
+			echo "Failed to convert trac field {$label_name}: $error\n";
 		}
 	}
 }
@@ -206,7 +213,7 @@ if (!$skip_tickets) {
 		}
 		if (!$skip_comments) {
 			// restore original values (at ticket creation time), to restore modification history later
-			foreach (['owner', 'priority', 'resolution', 'milestone', 'type', 'component', 'description', 'summary'] as $f) {
+			foreach ( array('owner', 'priority', 'resolution', 'milestone', 'type', 'component', 'description', 'summary') as $f ) {
 				$row[$f] = trac_orig_value($row, $f);
 			}
 		}
@@ -225,6 +232,9 @@ if (!$skip_tickets) {
 		}
 		if (!empty($labels['R'][crc32($row['resolution'])])) {
 			$ticketLabels[] = $labels['R'][crc32($row['resolution'])];
+		}
+		if (!empty($labels['S'][crc32($row['severity'])])) {
+			$ticketLabels[] = $labels['S'][crc32($row['severity'])];
 		}
 
 		$body = make_body($row['description']);
@@ -313,7 +323,7 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 				$text = '**Modified by ' . $row['author'] . ' on ' . $timestamp . "**";
 			}
 			$resp = github_add_comment($tickets[$row['ticket']], translate_markup($text));
-		} else if (in_array($row['field'], ['component', 'priority', 'type', 'resolution'])) {
+		} else if (in_array($row['field'], array('component', 'priority', 'type', 'resolution') )) {
 			if (in_array($labels[strtoupper($row['field'])[0]][crc32($row['oldvalue'])], $ticketLabels)) {
 				$index = array_search($labels[strtoupper($row['field'])[0]][crc32($row['oldvalue'])], $ticketLabels);
 				$ticketLabels[$index] = $labels[strtoupper($row['field'])[0]][crc32($row['newvalue'])];
@@ -374,13 +384,14 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 		// Wait 1sec to ensure the next event will be after
 		// just added (apparently github can reorder
 		// changes/comments if added too fast)
-		sleep(1);
+		// Change to 10 sec to slow things down to prevent perceived abuse of GitHub
+		sleep(10);
 	}
 	return true;
 }
 
 function github_req($url, $json, $patch = false, $post = true) {
-	global $username, $password, $request_count;
+	global $username, $password, $request_count, $project, $user_email;
 	$ch = curl_init();
 	curl_setopt($ch, CURLOPT_USERPWD, "$username:$password");
 	curl_setopt($ch, CURLOPT_URL, "https://api.github.com$url");
@@ -389,7 +400,7 @@ function github_req($url, $json, $patch = false, $post = true) {
 	curl_setopt($ch, CURLOPT_HEADER, true);
 	curl_setopt($ch, CURLOPT_POST, $post);
 	curl_setopt($ch, CURLOPT_POSTFIELDS, $json);
-	curl_setopt($ch, CURLOPT_USERAGENT, "trac2github for $project, admin@example.com");
+	curl_setopt($ch, CURLOPT_USERAGENT, "trac2github for $project, $user_email");
 	if ($patch) {
 		curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PATCH');
 	} else if ($post) {
@@ -411,11 +422,11 @@ function github_req($url, $json, $patch = false, $post = true) {
 
 	if ($patch || $post) {
 		$request_count++;
-		if($request_count > 50) {
+		if($request_count > 20) {
+			// Slow things down to prevent perceived abuse of GitHub
 			sleep(70);
 			$request_count = 0;
 		}
-
 	}
 
 	return $body;
@@ -460,7 +471,7 @@ function github_get_milestones() {
 function github_get_labels() {
 	global $project, $repo, $verbose;
 	if ($verbose) print_r($body);
-	return array_merge(json_decode(github_req("/repos/$project/$repo/labels?per_page=100", false, false, false), true), json_decode(github_req("/repos/$project/$repo/labels?page=2&per_page=100", false, false, false), true));
+	return json_decode(github_req("/repos/$project/$repo/labels?per_page=100", false, false, false), true);
 }
 
 function make_body($description) {
