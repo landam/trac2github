@@ -358,7 +358,7 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 			}
 			// $resp = github_update_issue($tickets[$ticket], array(
 			// 			'assignee' => $assignee
-						));
+			//			));
 		} else if ($row['field'] == 'milestone') {
 			if (empty($row['newvalue'])) {
 				$milestone = NULL;

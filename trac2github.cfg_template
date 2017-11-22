@@ -75,8 +75,8 @@ $remap_labels = array(
 
 // Do not convert tickets
 $skip_tickets   = false;
-$ticket_offset  = 0; // Start at this offset if limit > 0
 $ticket_limit   = 0; // Max tickets per run if > 0
+$ticket_offset  = 167; // Start at this database entry offset if ticket_limit > 0; ignored if ticket_limit = 0
 $ticket_try_preserve_numbers  = false;
 
 // Do not convert comments nor ticket history
