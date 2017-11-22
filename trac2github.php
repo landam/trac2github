@@ -357,15 +357,15 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 			$resp = github_update_issue($tickets[$ticket], array(
 						'body' => $body
 						));
-		} else if ($row['field'] == 'owner') {
-			if (!empty($row['newvalue'])) {
-				$assignee = isset($users_list[$row['newvalue']]) ? $users_list[$row['newvalue']] : NULL;
-			} else {
-				$assignee = NULL;
-			}
-			// $resp = github_update_issue($tickets[$ticket], array(
-			// 			'assignee' => $assignee
-			//			));
+		// } else if ($row['field'] == 'owner') {
+		//	if (!empty($row['newvalue'])) {
+		//		$assignee = isset($users_list[$row['newvalue']]) ? $users_list[$row['newvalue']] : NULL;
+		//	} else {
+		//		$assignee = NULL;
+		//	}
+		//	$resp = github_update_issue($tickets[$ticket], array(
+		//				'assignee' => $assignee
+		//				));
 		} else if ($row['field'] == 'milestone') {
 			if (empty($row['newvalue'])) {
 				$milestone = NULL;
