@@ -61,31 +61,56 @@ $skip_labels = false;
 // C: component
 // P: priority
 // R: resolution
+// S: severity
+// M: milestones (as labels)
 $remap_labels = array(
 	'T: defect' => 'bug',
 	'T: feature' => 'enhancement',
 	'T: enhancement' => 'enhancement',
+	'T: task' => 'enhancement',
+	'P: highest' => 'P: highest',
+	'P: high' => 'P: high',
+	'P: normal' => 'P: normal',
+	'P: low' => 'P: low',
+	'P: lowest' => 'P: lowest',
 	'R: implemented' => NULL,
 	'R: fixed' => NULL,
 	'R: invalid' => 'invalid',
 	'R: wontfix' => 'wontfix',
+	'R: duplicate' => 'duplicate',
 	'R: worksforme' => 'worksforme',
 	'R: notanissue' => 'notanissue',
+	'S: blocker' => 'S: blocker',
+	'S: critical' => 'S: critical',
+	'S: major' => 'S: major',
+	'S: normal' => 'S: normal',
+	'S: minor' => 'S: minor',
+	'S: trivial' => 'S: trivial',
 );
 
 // Do not convert tickets
 $skip_tickets   = false;
 $ticket_limit   = 0; // Max tickets per run if > 0
-$ticket_offset  = 167; // Start at this database entry offset if ticket_limit > 0; ignored if ticket_limit = 0
-$ticket_try_preserve_numbers  = false;
+$ticket_offset  = 0; // Start at this database entry if ticket_limit > 0; ignored if ticket_limit = 0
+$ticket_try_preserve_numbers = false;
 
 // Do not convert comments nor ticket history
 $skip_comments   = false;
 $comments_offset = 0; // Start at this offset if limit > 0
 $comments_limit  = 0; // Max comments per run if > 0
 
+// Do not add comments for attachments
+$skip_attachments = false;
+// Directory to contain attachments from Trac that need to be uploaded into GitHub
+$attachment_dir = "./attachments";
+// Add comments for attachments on Trac tickets >= attach_tracid_start and < attach_tracid_end
+$attach_tracid_start = 0;
+$attach_tracid_end = 0;
+
 // Whether to add a "Migrated-From:" suffix to each issue's body
 $add_migrated_suffix = false;
+
+// URL of the this Trac instance; for Migrated-From and for getting the attachments
 $trac_url = 'http://my.domain/trac/env';
 
 // Paths to milestone/ticket cache if you run it multiple times with skip/offset

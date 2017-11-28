@@ -61,7 +61,7 @@ $milestones = array();
 
 if (!$skip_milestones) {
 	// Export all milestones
-	$res = $trac_db->query("SELECT * FROM milestone ORDER BY due");
+	$res = $trac_db->query("SELECT * FROM milestone ORDER BY CAST(due AS DOUBLE)");
 	$mnum = 1;
 	$existing_milestones = array();
 	foreach (github_get_milestones() as $m) {
@@ -258,13 +258,17 @@ if (!$skip_tickets) {
 		} else {
 			$assignee = NULL;
 		}
-		$resp = github_add_issue(array(
+		$infoarray = array(
 			'title' => $row['summary'],
 			'body' => body_with_possible_suffix($body, $row['id']),
-			// 'assignee' => $assignee,
 			'milestone' => $milestone,
-			'labels' => $ticketLabels
-		));
+			'labels' => $ticketLabels,
+		);
+		if (!empty($assignee)) {
+			$infoarray['assignee'] = $assignee;
+			$infoarray['assignees'] = array($assignee);
+		}
+		$resp = github_add_issue($infoarray);
 		if (isset($resp['number'])) {
 			// OK
 			$tickets[$row['id']] = (int) $resp['number'];
@@ -273,6 +277,15 @@ if (!$skip_tickets) {
 			if ($ticket_try_preserve_numbers and $row['id'] != $resp['number']) {
 				echo "ERROR: New ticket number do not match the original one!\n";
 				break;
+			}
+			if (!$skip_attachments) {
+				$tracid = $row['id'];
+				$gitid = $tickets[$row['id']];
+				if ( ($tracid >= $attach_tracid_start) and (($tracid < $attach_tracid_end) or ($attach_tracid_end <= 0)) ) {
+					if (!add_attachment_comment($tracid, $gitid)) {
+						break;
+					}
+				}
 			}
 			if (!$skip_comments) {
 				if (!add_changes_for_ticket($row['id'], $ticketLabels)) {
@@ -306,16 +319,68 @@ echo "Done whatever possible, sorry if not.\n";
 function trac_orig_value($ticket, $field) {
 	global $trac_db;
 	$orig_value = $ticket[$field];
-	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change WHERE ticket = {$ticket['id']} AND field = '$field' ORDER BY time LIMIT 1");
+	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change WHERE ticket = {$ticket['id']} AND field = '$field' ORDER BY CAST(time AS DOUBLE) LIMIT 1");
 	foreach ($res->fetchAll() as $row) {
 		$orig_value = $row['oldvalue'];
 	}
 	return $orig_value;
 }
 
+function add_attachment_comment($tracid, $gitid) {
+	global $trac_db, $attachment_dir, $trac_url;
+	// Don't make the attachment subdirectory unless there actually are attachments
+	$attachdir = "$attachment_dir/TRAC_{$tracid}_GIT_$gitid";
+	$res = $trac_db->query("SELECT * FROM `attachment` WHERE `type` = 'ticket' AND `id` = '" . $tracid . "' ORDER BY CAST(time AS DOUBLE)");
+	$dirmade = false;
+	foreach ($res->fetchAll() as $row) {
+		if (!$dirmade) {
+			if (!file_exists($attachdir)) {
+				if (!mkdir($attachdir)) {
+					echo "Failed to make directory $attachdir\n";
+					return false;
+				}
+			}
+			$dirmade = true;
+		}
+		// Add a comment for the attachment
+		$attachfile = "$attachdir/" . $row['filename'];
+		$timestamp = date("j M Y H:i e", $row['time']/1000000);
+		$text = '**Attachment from ' . $row['author'] . ' on ' . $timestamp . "**\n";
+		$text = $text . $row['description'] . "\n";
+		$text = $text . "REPLACE THIS TEXT WITH UPLOADED FILE $attachfile\n";
+		$resp = github_add_comment($gitid, translate_markup($text));
+		if (isset($resp['url'])) {
+			// OK
+			echo "Comment created; need to upload file $attachfile\n";
+		} else {
+			// Error
+			$error = print_r($resp, 1);
+			echo "Failed to add a comment for $attachfile : $error\n";
+			return false;
+		}
+		// Get the file from trac and save it under the specified directory
+		$atturl = $trac_url . "/raw-attachment/ticket/$tracid/" . urlencode($row['filename']);
+		$data = file_get_contents($atturl);
+		if  ( $data === false ) {
+			echo "Unable to download the contents for attachment file $attachfile\n";
+			return false;
+		}
+		if ( file_put_contents($attachfile, $data) === false ) {
+			echo "Unable to write the contents for attachment file $attachfile\n";
+			return false;
+		}
+		// Wait 1sec to ensure the next event will be after
+		// just added (apparently github can reorder
+		// changes/comments if added too fast)
+		// Change to 10 sec to slow things down to prevent perceived abuse of GitHub
+		sleep(10);
+	}
+	return true;
+}
+
 function add_changes_for_ticket($ticket, $ticketLabels) {
 	global $trac_db, $tickets, $labels, $users_list, $milestones, $skip_comments, $verbose;
-	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change, ticket WHERE ticket.id = ticket_change.ticket AND ticket = $ticket ORDER BY ticket, time, field <> 'comment'");
+	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change, ticket WHERE ticket.id = ticket_change.ticket AND ticket = $ticket ORDER BY ticket, CAST(time AS DOUBLE), field <> 'comment'");
 	foreach ($res->fetchAll() as $row) {
 		if ($verbose) print_r($row);
 		if (!isset($tickets[$row['ticket']])) {
@@ -357,15 +422,21 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 			$resp = github_update_issue($tickets[$ticket], array(
 						'body' => $body
 						));
-		// } else if ($row['field'] == 'owner') {
-		//	if (!empty($row['newvalue'])) {
-		//		$assignee = isset($users_list[$row['newvalue']]) ? $users_list[$row['newvalue']] : NULL;
-		//	} else {
-		//		$assignee = NULL;
-		//	}
-		//	$resp = github_update_issue($tickets[$ticket], array(
-		//				'assignee' => $assignee
-		//				));
+		 } else if ($row['field'] == 'owner') {
+			if (!empty($row['newvalue'])) {
+				$assignee = isset($users_list[$row['newvalue']]) ? $users_list[$row['newvalue']] : NULL;
+			} else {
+				$assignee = NULL;
+			}
+			if (!empty($assignee)) {
+				$resp = github_update_issue($tickets[$ticket], array(
+							'assignee' => $assignee,
+							'assignees' => array($assignee)
+							));
+			} else {
+				echo "WARNING: ignoring change of {$row['field']} to {$row['newvalue']}\n";
+				continue;
+			}
 		} else if ($row['field'] == 'milestone') {
 			if (empty($row['newvalue'])) {
 				$milestone = NULL;
