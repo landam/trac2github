@@ -217,13 +217,13 @@ if (!$skip_tickets) {
 		}
 		if (!$skip_comments) {
 			// restore original values (at ticket creation time), to restore modification history later
-			foreach ( array('owner', 'priority', 'resolution', 'severity', 'milestone', 'type', 'component', 'description', 'summary') as $f ) {
+			foreach ( array('priority', 'resolution', 'severity', 'milestone', 'type', 'component', 'description', 'summary') as $f ) {
 				$row[$f] = trac_orig_value($row, $f);
 			}
 		}
-		if (!empty($row['owner']) and !isset($users_list[$row['owner']])) {
-			$row['owner'] = NULL;
-		}
+		// if (!empty($row['owner']) and !isset($users_list[$row['owner']])) {
+		// 	$row['owner'] = NULL;
+		// }
 		$ticketLabels = array();
 		if (!empty($labels['T'][crc32($row['type'])])) {
 			$ticketLabels[] = $labels['T'][crc32($row['type'])];
@@ -246,28 +246,28 @@ if (!$skip_tickets) {
 
 		$body = make_body($row['description']);
 		$timestamp = date("j M Y H:i e", $row['time']/1000000);
-		$body = '**Reported by ' . obfuscate_email($row['reporter']) . ' on ' . $timestamp . "**\n" . $body;
+		$body = '**Reported by ' . convert_username($row['reporter']) . ' on ' . $timestamp . "**\n" . $body;
 
 		if (empty($row['milestone'])) {
 			$milestone = NULL;
 		} else {
 			$milestone = $milestones[crc32($row['milestone'])];
 		}
-		if (!empty($row['owner'])) {
-			$assignee = isset($users_list[$row['owner']]) ? $users_list[$row['owner']] : $row['owner'];
-		} else {
-			$assignee = NULL;
-		}
+		// if (!empty($row['owner'])) {
+		// 	$assignee = isset($users_list[$row['owner']]) ? $users_list[$row['owner']] : $row['owner'];
+		// } else {
+		// 	$assignee = NULL;
+		// }
 		$infoarray = array(
 			'title' => $row['summary'],
 			'body' => body_with_possible_suffix($body, $row['id']),
 			'milestone' => $milestone,
 			'labels' => $ticketLabels,
 		);
-		if (!empty($assignee)) {
-			$infoarray['assignee'] = $assignee;
-			$infoarray['assignees'] = array($assignee);
-		}
+		// if (!empty($assignee)) {
+		// 	$infoarray['assignee'] = $assignee;
+		// 	$infoarray['assignees'] = array($assignee);
+		// }
 		$resp = github_add_issue($infoarray);
 		if (isset($resp['number'])) {
 			// OK
@@ -345,7 +345,7 @@ function add_attachment_comment($tracid, $gitid) {
 		// Add a comment for the attachment
 		$attachfile = "$attachdir/" . $row['filename'];
 		$timestamp = date("j M Y H:i e", $row['time']/1000000);
-		$text = '**Attachment from ' . $row['author'] . ' on ' . $timestamp . "**\n";
+		$text = '**Attachment from ' . convert_username($row['author']) . ' on ' . $timestamp . "**\n";
 		$text = $text . $row['description'] . "\n";
 		$text = $text . "REPLACE THIS TEXT WITH UPLOADED FILE $attachfile\n";
 		$resp = github_add_comment($gitid, translate_markup($text));
@@ -390,9 +390,9 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 		$timestamp = date("j M Y H:i e", $row['time']/1000000);
 		if ($row['field'] == 'comment') {
 			if ($row['newvalue'] != '') {
-				$text = '**Comment by ' . $row['author'] . ' on ' . $timestamp . "**\n" . $row['newvalue'];
+				$text = '**Comment by ' . covert_username($row['author']) . ' on ' . $timestamp . "**\n" . $row['newvalue'];
 			} else {
-				$text = '**Modified by ' . $row['author'] . ' on ' . $timestamp . "**";
+				$text = '**Modified by ' . convert_username($row['author']) . ' on ' . $timestamp . "**";
 			}
 			$resp = github_add_comment($tickets[$row['ticket']], translate_markup($text));
 		} else if (in_array($row['field'], array('component', 'priority', 'type', 'resolution', 'severity') )) {
@@ -413,30 +413,29 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 			$resp = github_update_issue($tickets[$ticket], array(
 						'title' => $row['newvalue']
 						));
-		} else if (false and $row['field'] == 'description') { // TODO?
-			$body = make_body($row['newvalue']);
-			$timestamp = date("j M Y H:i e", $row['time']/1000000);
-			// TODO:
-			//$body = '**Reported by ' . obfuscate_email($row['reporter']) . ' on ' . $timestamp . "**\n" . $body;
-
-			$resp = github_update_issue($tickets[$ticket], array(
-						'body' => $body
-						));
-		 } else if ($row['field'] == 'owner') {
-			if (!empty($row['newvalue'])) {
-				$assignee = isset($users_list[$row['newvalue']]) ? $users_list[$row['newvalue']] : NULL;
-			} else {
-				$assignee = NULL;
-			}
-			if (!empty($assignee)) {
-				$resp = github_update_issue($tickets[$ticket], array(
-							'assignee' => $assignee,
-							'assignees' => array($assignee)
-							));
-			} else {
-				echo "WARNING: ignoring change of {$row['field']} to {$row['newvalue']}\n";
-				continue;
-			}
+		// } else if ($row['field'] == 'description') { // TODO?
+		// 	$body = make_body($row['newvalue']);
+		// 	$timestamp = date("j M Y H:i e", $row['time']/1000000);
+		// 	// TODO:
+		// 	$body = '**Reported by ' . convert_username($row['reporter']) . ' on ' . $timestamp . "**\n" . $body;
+		//	$resp = github_update_issue($tickets[$ticket], array(
+		//				'body' => $body
+		//				));
+		// } else if ($row['field'] == 'owner') {
+		// 	if (!empty($row['newvalue'])) {
+		// 		$assignee = isset($users_list[$row['newvalue']]) ? $users_list[$row['newvalue']] : NULL;
+		// 	} else {
+		// 		$assignee = NULL;
+		// 	}
+		// 	if (!empty($assignee)) {
+		// 		$resp = github_update_issue($tickets[$ticket], array(
+		// 					'assignee' => $assignee,
+		// 					'assignees' => array($assignee)
+		// 					));
+		// 	} else {
+		// 		echo "WARNING: ignoring change of {$row['field']} to {$row['newvalue']}\n";
+		// 		continue;
+		// 	}
 		} else if ($row['field'] == 'milestone') {
 			if (empty($row['newvalue'])) {
 				$milestone = NULL;
@@ -565,7 +564,8 @@ function translate_markup($data) {
 	$data = preg_replace('/[^(\x00-\x7F)]*/','', $data);
 
 	// Translate Trac-style links to Markdown
-	$data = preg_replace('/\[([^ ]+) ([^\]]+)\]/', '[$2]($1)', $data);
+	// DO NOT DO THIS - the regex is far too generic: "a[1] b[2]" => "a[b[2](1])"
+	// $data = preg_replace('/\[([^ ]+) ([^\]]+)\]/', '[$2]($1)', $data);
 
 	// Possibly translate other markup as well?
 	return $data;
@@ -577,11 +577,15 @@ function body_with_possible_suffix($body, $id) {
 	return "$body\n\nMigrated-From: $trac_url/ticket/$id";
 }
 
-function obfuscate_email($text)
+function convert_username($username)
 {
-    list($text) = explode('@', $text);
-    $text = preg_replace('/[^a-z0-9]/i', ' ', $text);
-    return $text;
+	global $users_list;
+	if (array_key_exists($username, $users_list)) {
+		$username = $users_list[$username]
+	} else {
+		echo "WARNING: No GitHub username for Trac username '{$username}'\n"
+	}
+	return $username;
 }
 
 
