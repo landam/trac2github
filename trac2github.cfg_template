@@ -19,11 +19,15 @@ $repo       = 'GitHub repository';
 // Email address added to API requests (in case GitHub needs to contact you)
 $user_email = 'Put your email address here';
 
-// All users must be valid github logins!
+// Array for translating Trac usernames to usernames shown in GitHub.
+// If desired, prefix an actual GitHub username with '@' so the name becomes a mentioned user.
+// By default, users mentioned in an issue receive notices of changes in the issue.
 $users_list = array(
 	'TracUsermame' => 'GithubUsername',
-	'Trustmaster' => 'trustmaster',
-	'John.Done' => 'johndoe'
+	'John.Doe' => '@johndoe'
+	'retired.user' => 'retired.user',
+	'anonymous' => 'anonymous',
+	'nobody' => 'anonymous',
 );
 
 //Restrict to certain components (null or Array with components name).
