@@ -390,7 +390,7 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 		$timestamp = date("j M Y H:i e", $row['time']/1000000);
 		if ($row['field'] == 'comment') {
 			if ($row['newvalue'] != '') {
-				$text = '**Comment by ' . covert_username($row['author']) . ' on ' . $timestamp . "**\n" . $row['newvalue'];
+				$text = '**Comment by ' . convert_username($row['author']) . ' on ' . $timestamp . "**\n" . $row['newvalue'];
 			} else {
 				$text = '**Modified by ' . convert_username($row['author']) . ' on ' . $timestamp . "**";
 			}
@@ -581,9 +581,9 @@ function convert_username($username)
 {
 	global $users_list;
 	if (array_key_exists($username, $users_list)) {
-		$username = $users_list[$username]
+		$username = $users_list[$username];
 	} else {
-		echo "WARNING: No GitHub username for Trac username '{$username}'\n"
+		echo "WARNING: No GitHub username for Trac username '{$username}'\n";
 	}
 	return $username;
 }
