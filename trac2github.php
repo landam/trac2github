@@ -115,7 +115,7 @@ if (!$skip_labels) {
 	$res = $trac_db->query("SELECT DISTINCT 'T' AS label_type, type AS name, 'cccccc' AS color
 	                        FROM ticket WHERE COALESCE(type, '') <> ''
 	                        UNION
-	                        SELECT DISTINCT 'C' AS label_type, component AS name, '0000aa' AS color
+	                        SELECT DISTINCT 'C' AS label_type, component AS name, 'bfd4f2' AS color
 	                        FROM ticket WHERE COALESCE (component, '')  <> ''
 	                        UNION
 	                        SELECT DISTINCT 'P' AS label_type, priority AS name, case when lower(priority) = 'urgent'   then 'ff0000'
