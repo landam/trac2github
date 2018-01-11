@@ -563,6 +563,9 @@ function translate_markup($data) {
 	// Avoid non-ASCII characters, as that will cause trouble with json_encode()
 	$data = preg_replace('/[^(\x00-\x7F)]*/','', $data);
 
+	// Convert 'Ticket #NNN' to 'Ticket NNN' so GitHub won't think it is issue NNN
+	$data = preg_replace('/icket #([0-9]+)/','icket $1', $data);
+
 	// Translate Trac-style links to Markdown
 	// DO NOT DO THIS - the regex is far too generic: "a[1] b[2]" => "a[b[2](1])"
 	// $data = preg_replace('/\[([^ ]+) ([^\]]+)\]/', '[$2]($1)', $data);
