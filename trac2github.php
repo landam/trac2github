@@ -363,11 +363,9 @@ function add_attachment_comment($tracid, $gitid) {
 		$data = file_get_contents($atturl);
 		if  ( $data === false ) {
 			echo "Unable to download the contents for attachment file $attachfile\n";
-			return false;
 		}
-		if ( file_put_contents($attachfile, $data) === false ) {
+		else if ( file_put_contents($attachfile, $data) === false ) {
 			echo "Unable to write the contents for attachment file $attachfile\n";
-			return false;
 		}
 		// Wait 1sec to ensure the next event will be after
 		// just added (apparently github can reorder
