@@ -61,7 +61,7 @@ $milestones = array();
 
 if (!$skip_milestones) {
 	// Export all milestones
-	$res = $trac_db->query("SELECT * FROM milestone ORDER BY CAST(due AS DOUBLE PRECISION)");
+	$res = $trac_db->query("SELECT * FROM milestone where completed = 0 and name like '7%' or name like '8%' ORDER BY CAST(due AS DOUBLE PRECISION)");
 	$mnum = 1;
 	$existing_milestones = array();
 	foreach (github_get_milestones() as $m) {
@@ -119,7 +119,7 @@ if (!$skip_labels) {
 	                        SELECT DISTINCT 'C' AS label_type, component AS name, 'bfd4f2' AS color
 	                        FROM ticket WHERE COALESCE (component, '')  <> ''
 	                        UNION
-	                        SELECT DISTINCT 'P' AS label_type, priority AS name, case when lower(priority) = 'urgent'   then 'ff0000'
+	                        SELECT DISTINCT 'S' AS label_type, priority AS name, case when lower(priority) = 'urgent'   then 'ff0000'
 	                                                                                  when lower(priority) = 'high'     then 'ff6666'
 	                                                                                  when lower(priority) = 'medium'   then 'ffaaaa'
 	                                                                                  when lower(priority) = 'low'      then 'ffdddd'
@@ -127,7 +127,7 @@ if (!$skip_labels) {
 	                                                                                  when lower(priority) = 'critical' then 'ffffb8'
 	                                                                                  when lower(priority) = 'major'    then 'f6f6f6'
 	                                                                                  when lower(priority) = 'minor'    then 'dcffff'
-	                                                                                  when lower(priority) = 'trivial'  then 'dce7ff'
+/*	                                                                                  when lower(priority) = 'trivial'  then 'dce7ff' */
 	                                                                                  else                                   'aa8888' end color
 	                        FROM ticket WHERE COALESCE(priority, '')   <> ''
 	                        UNION
@@ -138,7 +138,7 @@ if (!$skip_labels) {
 				FROM ticket WHERE COALESCE(severity, '') <> ''
 				UNION
 	                        SELECT DISTINCT 'OS' AS label_type, value AS name, '880000' AS color
-				FROM ticket_custom WHERE name = 'platform' AND value NOT LIKE 'MS%' AND value <> 'All'
+				FROM ticket_custom WHERE name = 'platform' AND value NOT LIKE 'MS%' AND value <> 'All' and value <> 'Unspecified'
 				UNION
 	                        SELECT DISTINCT 'OS' AS label_type, 'MS Windows' AS name, '880000' AS color");
 //	                        UNION
@@ -264,7 +264,7 @@ if (!$skip_tickets) {
 		$body = make_body($row['description']);
 		$timestamp = date("j M Y H:i e", $row['time']/1000000);
 		$body = '**Reported by ' . convert_username($row['reporter']) . ' on ' . $timestamp . "**\n" . $body;
-		if (!empty($platform) and $platform != "All") {
+		if (!empty($platform) and $platform != "All" and $platform != "Unspecified") {
 		   $body .= "\n### Operating system\n" . $platform . "\n";
 		}
 		if (!empty($row['version'])) {
@@ -589,14 +589,14 @@ function translate_markup($data) {
 	$data = preg_replace('/[^(\x00-\x7F)]*/','', $data);
 
 	// Convert 'Ticket #NNN' to 'Ticket NNN' so GitHub won't think it is issue NNN
-	$data = preg_replace('/icket #([0-9]+)/','icket $1', $data);
+	$data = preg_replace('/#([0-9]+)/','https://trac.osgeo.org/grass/ticket/$1', $data);
 
 	// Translate Trac-style links to Markdown
 	// DO NOT DO THIS - the regex is far too generic: "a[1] b[2]" => "a[b[2](1])"
 	// $data = preg_replace('/\[([^ ]+) ([^\]]+)\]/', '[$2]($1)', $data);
 
 	// Translate Rev to full URL
-	$data = preg_replace('/[A-Za-z]{0}r([0-9]{1,5})/', 'https://trac.osgeo.org/grass/changeset/$1', $data);
+	$data = preg_replace('/\br([0-9]{1,5})/', 'https://trac.osgeo.org/grass/changeset/$1', $data);
 
 	// Possibly translate other markup as well?
 	return $data;
