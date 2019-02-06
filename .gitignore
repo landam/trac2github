@@ -1,3 +1,5 @@
 trac2github.cfg
 trac2github.log
 trac_tickets.list
+*~
+attachments/

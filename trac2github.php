@@ -61,7 +61,7 @@ $milestones = array();
 
 if (!$skip_milestones) {
 	// Export all milestones
-	$res = $trac_db->query("SELECT * FROM milestone ORDER BY CAST(due AS DOUBLE)");
+	$res = $trac_db->query("SELECT * FROM milestone ORDER BY CAST(due AS DOUBLE PRECISION)");
 	$mnum = 1;
 	$existing_milestones = array();
 	foreach (github_get_milestones() as $m) {
@@ -109,6 +109,7 @@ $labels['P'] = array();
 $labels['R'] = array();
 $labels['S'] = array();
 $labels['M'] = array();
+$labels['OS'] = array();
 
 if (!$skip_labels) {
 	// Export all "labels"
@@ -135,9 +136,14 @@ if (!$skip_labels) {
 	                        UNION
 	                        SELECT DISTINCT 'S' AS label_type, severity AS name, 'ff55ff' AS color
 				FROM ticket WHERE COALESCE(severity, '') <> ''
-	                        UNION
-	                        SELECT DISTINCT 'M' AS label_type, milestone AS name, '880000' AS color
-				FROM ticket WHERE COALESCE(milestone, '') <> ''");
+				UNION
+	                        SELECT DISTINCT 'OS' AS label_type, value AS name, '880000' AS color
+				FROM ticket_custom WHERE name = 'platform' AND value NOT LIKE 'MS%' AND value <> 'All'
+				UNION
+	                        SELECT DISTINCT 'OS' AS label_type, 'MS Windows' AS name, '880000' AS color");
+//	                        UNION
+//	                        SELECT DISTINCT 'M' AS label_type, milestone AS name, '880000' AS color
+//				FROM ticket WHERE COALESCE(milestone, '') <> ''");
 
 	$existing_labels = array();
 	foreach (github_get_labels() as $l) {
@@ -185,7 +191,7 @@ if (file_exists($save_tickets)) {
 
 if (!$skip_tickets) {
 	// Export tickets
-	$limit = $ticket_limit > 0 ? "LIMIT $ticket_offset, $ticket_limit" : '';
+	$limit = $ticket_limit > 0 ? "OFFSET $ticket_offset LIMIT $ticket_limit" : '';
 
 	$res = $trac_db->query("SELECT * FROM ticket WHERE 1=1 $my_components ORDER BY id $limit");
 	foreach ($res->fetchAll() as $row) {
@@ -215,6 +221,14 @@ if (!$skip_tickets) {
 				}
 			}
 		}
+		$resp = $trac_db->query("SELECT value FROM ticket_custom WHERE ticket=" . $row['id'] . " AND name = 'platform'");
+		foreach ($resp->fetchAll() as $rowp) {
+		   $platform = $rowp['value'];
+		   if (substr( $platform, 0, 2 ) === "MS") {
+		      $platform = 'MS Windows';
+                   }
+		   break;
+		}
 		if (!$skip_comments) {
 			// restore original values (at ticket creation time), to restore modification history later
 			foreach ( array('priority', 'resolution', 'severity', 'milestone', 'type', 'component', 'description', 'summary') as $f ) {
@@ -243,10 +257,19 @@ if (!$skip_tickets) {
 		if (!empty($labels['M'][crc32($row['milestone'])])) {
 			$ticketLabels[] = $labels['M'][crc32($row['milestone'])];
 		}
+		if (!empty($labels['OS'][crc32($platform)])) {
+			$ticketLabels[] = $labels['OS'][crc32($platform)];
+		}
 
 		$body = make_body($row['description']);
 		$timestamp = date("j M Y H:i e", $row['time']/1000000);
 		$body = '**Reported by ' . convert_username($row['reporter']) . ' on ' . $timestamp . "**\n" . $body;
+		if (!empty($platform) and $platform != "All") {
+		   $body .= "\n### Operating system\n" . $platform . "\n";
+		}
+		if (!empty($row['version'])) {
+		   $body .= "\n### GRASS GIS version and provenance\n" . $row['version'] . "\n";
+		}
 
 		if (empty($row['milestone'])) {
 			$milestone = NULL;
@@ -319,7 +342,8 @@ echo "Done whatever possible, sorry if not.\n";
 function trac_orig_value($ticket, $field) {
 	global $trac_db;
 	$orig_value = $ticket[$field];
-	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change WHERE ticket = {$ticket['id']} AND field = '$field' ORDER BY CAST(time AS DOUBLE) LIMIT 1");
+//	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change WHERE ticket = {$ticket['id']} AND field = '$field' ORDER BY CAST(time AS DOUBLE PRECISION) LIMIT 1");
+	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change WHERE ticket = {$ticket['id']} AND field = '$field' ORDER BY time LIMIT 1");
 	foreach ($res->fetchAll() as $row) {
 		$orig_value = $row['oldvalue'];
 	}
@@ -330,7 +354,8 @@ function add_attachment_comment($tracid, $gitid) {
 	global $trac_db, $attachment_dir, $trac_url;
 	// Don't make the attachment subdirectory unless there actually are attachments
 	$attachdir = "$attachment_dir/TRAC_{$tracid}_GIT_$gitid";
-	$res = $trac_db->query("SELECT * FROM `attachment` WHERE `type` = 'ticket' AND `id` = '" . $tracid . "' ORDER BY CAST(time AS DOUBLE)");
+	//	$res = $trac_db->query("SELECT * FROM attachment WHERE type = 'ticket' AND id = '" . $tracid . "' ORDER BY CAST(time AS DOUBLE PRECISION)");
+	$res = $trac_db->query("SELECT * FROM attachment WHERE type = 'ticket' AND id = '" . $tracid . "' ORDER BY time");
 	$dirmade = false;
 	foreach ($res->fetchAll() as $row) {
 		if (!$dirmade) {
@@ -347,7 +372,8 @@ function add_attachment_comment($tracid, $gitid) {
 		$timestamp = date("j M Y H:i e", $row['time']/1000000);
 		$text = '**Attachment from ' . convert_username($row['author']) . ' on ' . $timestamp . "**\n";
 		$text = $text . $row['description'] . "\n";
-		$text = $text . "REPLACE THIS TEXT WITH UPLOADED FILE $attachfile\n";
+		// 		$text = $text . "REPLACE THIS TEXT WITH UPLOADED FILE $attachfile\n";
+		$text = $text . "https://trac.osgeo.org/grass/attachment/ticket/" . $tracid . "/" . $row['filename'] . "\n";
 		$resp = github_add_comment($gitid, translate_markup($text));
 		if (isset($resp['url'])) {
 			// OK
@@ -378,7 +404,8 @@ function add_attachment_comment($tracid, $gitid) {
 
 function add_changes_for_ticket($ticket, $ticketLabels) {
 	global $trac_db, $tickets, $labels, $users_list, $milestones, $skip_comments, $verbose;
-	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change, ticket WHERE ticket.id = ticket_change.ticket AND ticket = $ticket ORDER BY ticket, CAST(time AS DOUBLE), field <> 'comment'");
+	//	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change, ticket WHERE ticket.id = ticket_change.ticket AND ticket = $ticket ORDER BY ticket, CAST(time AS DOUBLE PRECISION), field <> 'comment'");
+	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change, ticket WHERE ticket.id = ticket_change.ticket AND ticket = $ticket ORDER BY ticket, time, field <> 'comment'");
 	foreach ($res->fetchAll() as $row) {
 		if ($verbose) print_r($row);
 		if (!isset($tickets[$row['ticket']])) {
@@ -567,6 +594,9 @@ function translate_markup($data) {
 	// Translate Trac-style links to Markdown
 	// DO NOT DO THIS - the regex is far too generic: "a[1] b[2]" => "a[b[2](1])"
 	// $data = preg_replace('/\[([^ ]+) ([^\]]+)\]/', '[$2]($1)', $data);
+
+	// Translate Rev to full URL
+	$data = preg_replace('/[A-Za-z]{0}r([0-9]{1,5})/', 'https://trac.osgeo.org/grass/changeset/$1', $data);
 
 	// Possibly translate other markup as well?
 	return $data;
