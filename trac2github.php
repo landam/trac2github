@@ -54,14 +54,28 @@ $trac_db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 echo "Connected to Trac\n";
 
 //if restriction to certain components is added, put this in the SQL string
-if ($use_components && is_array($use_components)) $my_components = " AND component IN ('".implode("', '", $use_components)."') ";
+if ($use_components && is_array($use_components)) {
+   if ($revert_components) {
+   $my_components = " AND component NOT IN ('".implode("', '", $use_components)."') ";
+   }
+   else {
+   $my_components = " AND component IN ('".implode("', '", $use_components)."') ";
+   }
+}
 else $my_components = "";
+
+// if restriction to certain milestones
+if ($use_milestones && is_array($use_milestones)) {
+   $my_milestones = " AND name IN ('".implode("', '", $use_milestones)."') ";
+   $my_milestones_t = " AND milestone IN ('".implode("', '", $use_milestones)."') ";
+}
+else $my_milestones = $my_milestone_t = "";
 
 $milestones = array();
 
 if (!$skip_milestones) {
 	// Export all milestones
-	$res = $trac_db->query("SELECT * FROM milestone where completed = 0 and name like '7%' or name like '8%' ORDER BY CAST(due AS DOUBLE PRECISION)");
+	$res = $trac_db->query("SELECT * FROM milestone where completed = 0 $my_milestones ORDER BY CAST(due AS DOUBLE PRECISION)");
 	$mnum = 1;
 	$existing_milestones = array();
 	foreach (github_get_milestones() as $m) {
@@ -119,7 +133,7 @@ if (!$skip_labels) {
 	                        SELECT DISTINCT 'C' AS label_type, component AS name, 'bfd4f2' AS color
 	                        FROM ticket WHERE COALESCE (component, '')  <> ''
 	                        UNION
-	                        SELECT DISTINCT 'S' AS label_type, priority AS name, case when lower(priority) = 'urgent'   then 'ff0000'
+	                        SELECT DISTINCT 'P' AS label_type, priority AS name, case when lower(priority) = 'urgent'   then 'ff0000'
 	                                                                                  when lower(priority) = 'high'     then 'ff6666'
 	                                                                                  when lower(priority) = 'medium'   then 'ffaaaa'
 	                                                                                  when lower(priority) = 'low'      then 'ffdddd'
@@ -193,7 +207,7 @@ if (!$skip_tickets) {
 	// Export tickets
 	$limit = $ticket_limit > 0 ? "OFFSET $ticket_offset LIMIT $ticket_limit" : '';
 
-	$res = $trac_db->query("SELECT * FROM ticket WHERE 1=1 $my_components ORDER BY id $limit");
+	$res = $trac_db->query("SELECT * FROM ticket WHERE 1=1 $my_components $my_milestones_t ORDER BY id $limit");
 	foreach ($res->fetchAll() as $row) {
 		if (isset($last_ticket_number) and $ticket_try_preserve_numbers) {
 			if ($last_ticket_number >= $row['id']) {
