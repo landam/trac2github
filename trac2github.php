@@ -617,6 +617,9 @@ function translate_markup($data) {
 	// Translate Rev to full URL
 	$data = preg_replace('/\br([0-9]{1,5})/', 'https://trac.osgeo.org/grass/changeset/$1', $data);
 
+	// Translete to full URL
+	$data = preg_replace('/[0-9]{1,5}\" ([0-9]{1,5})]/', '$1\"] https://trac.osgeo.org/grass/changeset/$1', $data);
+
 	// Possibly translate other markup as well?
 	return $data;
 }
