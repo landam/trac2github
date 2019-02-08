@@ -93,14 +93,14 @@ if (!$skip_milestones) {
 			$resp = github_add_milestone(array(
 				'title' => $row['name'],
 				'state' => $row['completed'] == 0 ? 'open' : 'closed',
-				'description' => empty($row['description']) ? '' : translate_markup($row['description'])
+				// 'description' => empty($row['description']) ? '' : translate_markup($row['description'])
 			));
 		}
 		else {
 			$resp = github_add_milestone(array(
 				'title' => $row['name'],
 				'state' => $row['completed'] == 0 ? 'open' : 'closed',
-				'description' => empty($row['description']) ? '' : translate_markup($row['description']),
+				// 'description' => empty($row['description']) ? '' : translate_markup($row['description']),
 				'due_on' => date('Y-m-d\TH:i:s\Z', $epochInSecs)
 			));
 		}
@@ -208,7 +208,12 @@ if (!$skip_tickets) {
 	$limit = $ticket_limit > 0 ? "OFFSET $ticket_offset LIMIT $ticket_limit" : '';
 
 	$res = $trac_db->query("SELECT * FROM ticket WHERE 1=1 $my_components $my_milestones_t ORDER BY id $limit");
+	$i = 0;
 	foreach ($res->fetchAll() as $row) {
+		$i = $i + 1;
+		if ($i % 25 == 0)
+		   sleep(60);
+
 		if (isset($last_ticket_number) and $ticket_try_preserve_numbers) {
 			if ($last_ticket_number >= $row['id']) {
 				echo "ERROR: Cannot create ticket #{$row['id']} because issue #{$last_ticket_number} was already created.";
