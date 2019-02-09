@@ -207,7 +207,7 @@ if (!$skip_tickets) {
 	// Export tickets
 	$limit = $ticket_limit > 0 ? "OFFSET $ticket_offset LIMIT $ticket_limit" : '';
 
-	$res = $trac_db->query("SELECT * FROM ticket WHERE 1=1 $my_components $my_milestones_t ORDER BY id $limit");
+	$res = $trac_db->query("SELECT * FROM ticket WHERE status != 'closed' $my_components $my_milestones_t ORDER BY id $limit");
 	$i = 0;
 	foreach ($res->fetchAll() as $row) {
 		$i = $i + 1;
