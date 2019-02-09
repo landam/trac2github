@@ -620,6 +620,16 @@ function translate_markup($data) {
 	// Translete to full URL
 	$data = preg_replace('/[0-9]{1,5}\" ([0-9]{1,5})]/', '$1\"] https://trac.osgeo.org/grass/changeset/$1', $data);
 
+	// Sections
+	$data = preg_replace('/==(.*)==/', '## $1', $data);
+
+	// BR
+	$data = preg_replace('/\[\[BR\]\]/', '', $data);
+
+	// Fix URL
+	$data = preg_replace('/\[http:\/\/(.*)\]/', 'http://$1', $data);
+	$data = preg_replace('/\[https:\/\/(.*)\]/', 'https://$1', $data);
+
 	// Possibly translate other markup as well?
 	return $data;
 }
