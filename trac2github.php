@@ -207,7 +207,19 @@ if (!$skip_tickets) {
 	// Export tickets
 	$limit = $ticket_limit > 0 ? "OFFSET $ticket_offset LIMIT $ticket_limit" : '';
 
-	$res = $trac_db->query("SELECT * FROM ticket WHERE status != 'closed' $my_components $my_milestones_t ORDER BY id $limit");
+	// First prepare lookup table
+	// $my_tickets = "and id in (1755, 3563)";
+	$sql = "SELECT * FROM ticket WHERE status != 'closed' $my_tickets $my_components $my_milestones_t ORDER BY id $limit";
+	$res = $trac_db->query($sql);
+	$i = 1;
+	$ticket_remap = array();
+	foreach ($res->fetchAll() as $row) {
+		$ticket_remap[$row['id']] = $i;
+		$i = $i + 1;
+	}
+
+	// Now export
+	$res = $trac_db->query($sql);
 	$i = 0;
 	foreach ($res->fetchAll() as $row) {
 		$i = $i + 1;
@@ -280,13 +292,13 @@ if (!$skip_tickets) {
 			$ticketLabels[] = $labels['OS'][crc32($platform)];
 		}
 
-		$body = make_body($row['description']);
+		$body = make_body($row['description'], $ticket_remap);
 		$timestamp = date("j M Y H:i e", $row['time']/1000000);
 		$body = '**Reported by ' . convert_username($row['reporter']) . ' on ' . $timestamp . "**\n" . $body;
 		if (!empty($platform) and $platform != "All" and $platform != "Unspecified") {
 		   $body .= "\n### Operating system\n" . $platform . "\n";
 		}
-		if (!empty($row['version'])) {
+		if (!empty($row['version']) and $row['version'] != "unspecified") {
 		   $body .= "\n### GRASS GIS version and provenance\n" . $row['version'] . "\n";
 		}
 
@@ -330,7 +342,7 @@ if (!$skip_tickets) {
 				}
 			}
 			if (!$skip_comments) {
-				if (!add_changes_for_ticket($row['id'], $ticketLabels)) {
+				if (!add_changes_for_ticket($row['id'], $ticketLabels, $ticket_remap)) {
 					break;
 				}
 			} else {
@@ -421,7 +433,7 @@ function add_attachment_comment($tracid, $gitid) {
 	return true;
 }
 
-function add_changes_for_ticket($ticket, $ticketLabels) {
+function add_changes_for_ticket($ticket, $ticketLabels, $ticket_remap) {
 	global $trac_db, $tickets, $labels, $users_list, $milestones, $skip_comments, $verbose;
 	//	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change, ticket WHERE ticket.id = ticket_change.ticket AND ticket = $ticket ORDER BY ticket, CAST(time AS DOUBLE PRECISION), field <> 'comment'");
 	$res = $trac_db->query("SELECT ticket_change.* FROM ticket_change, ticket WHERE ticket.id = ticket_change.ticket AND ticket = $ticket ORDER BY ticket, time, field <> 'comment'");
@@ -438,7 +450,7 @@ function add_changes_for_ticket($ticket, $ticketLabels) {
 			} else {
 				$text = '**Modified by ' . convert_username($row['author']) . ' on ' . $timestamp . "**";
 			}
-			$resp = github_add_comment($tickets[$row['ticket']], translate_markup($text));
+			$resp = github_add_comment($tickets[$row['ticket']], translate_markup($text, $ticket_remap));
 		} else if (in_array($row['field'], array('component', 'priority', 'type', 'resolution', 'severity') )) {
 			if (in_array($labels[strtoupper($row['field'])[0]][crc32($row['oldvalue'])], $ticketLabels)) {
 				$index = array_search($labels[strtoupper($row['field'])[0]][crc32($row['oldvalue'])], $ticketLabels);
@@ -595,11 +607,11 @@ function github_get_labels() {
 	return json_decode(github_req("/repos/$project/$repo/labels?per_page=100", false, false, false), true);
 }
 
-function make_body($description) {
-	return empty($description) ? 'None' : translate_markup($description);
+function make_body($description, $ticket_remap) {
+	return empty($description) ? 'None' : translate_markup($description, $ticket_remap);
 }
 
-function translate_markup($data) {
+function translate_markup($data, $ticket_remap = null) {
 	// Replace code blocks with an associated language
 	$data = preg_replace('/\{\{\{(\s*#!(\w+))?/m', '```$2', $data);
 	$data = preg_replace('/\}\}\}/', '```', $data);
@@ -608,8 +620,21 @@ function translate_markup($data) {
 	$data = preg_replace('/[^(\x00-\x7F)]*/','', $data);
 
 	// Convert 'Ticket #NNN' to 'Ticket NNN' so GitHub won't think it is issue NNN
-	$data = preg_replace('/#([0-9]+)/','https://trac.osgeo.org/grass/ticket/$1', $data);
-
+	if (isset($ticket_remap)) {
+	   $data = preg_replace_callback(
+	      '/#([0-9]+)/',
+	      function ($matches) use ($ticket_remap) {
+	      	 if (array_key_exists($matches[1], $ticket_remap)) {
+		    return '#' . $ticket_remap[$matches[1]];
+		  }
+		 return 'https://trac.osgeo.org/grass/ticket/' . $matches[1];
+	      },
+	      $data
+	   );
+	}	
+	else {
+	   $data = preg_replace('/#([0-9]+)/','https://trac.osgeo.org/grass/ticket/$1', $data);
+	}
 	// Translate Trac-style links to Markdown
 	// DO NOT DO THIS - the regex is far too generic: "a[1] b[2]" => "a[b[2](1])"
 	// $data = preg_replace('/\[([^ ]+) ([^\]]+)\]/', '[$2]($1)', $data);
@@ -629,6 +654,15 @@ function translate_markup($data) {
 	// Fix URL
 	$data = preg_replace('/\[http:\/\/(.*)\]/', 'http://$1', $data);
 	$data = preg_replace('/\[https:\/\/(.*)\]/', 'https://$1', $data);
+
+	// https://trac.osgeo.org/grass/wiki/InterMapTxt
+	$data = preg_replace('/G7:(.*)\s*/', 'https://grass.osgeo.org/grass77/manuals/$1.html', $data);
+	$data = preg_replace('/G70:(.*)\s*/', 'https://grass.osgeo.org/grass70/manuals/$1.html', $data);
+	$data = preg_replace('/G72:(.*)\s*/', 'https://grass.osgeo.org/grass72/manuals/$1.html', $data);
+	$data = preg_replace('/G74:(.*)\s*/', 'https://grass.osgeo.org/grass74/manuals/$1.html', $data);
+	$data = preg_replace('/G76:(.*)\s*/', 'https://grass.osgeo.org/grass76/manuals/$1.html', $data);
+	$data = preg_replace('/G78:(.*)\s*/', 'https://grass.osgeo.org/grass78/manuals/$1.html', $data);
+	$data = preg_replace('/G7A:(.*)\s*/', 'https://grass.osgeo.org/grass7/manuals/addons/$1.html', $data);
 
 	// Possibly translate other markup as well?
 	return $data;
