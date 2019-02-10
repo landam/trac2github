@@ -292,7 +292,7 @@ if (!$skip_tickets) {
 			$ticketLabels[] = $labels['OS'][crc32($platform)];
 		}
 
-		$body = make_body($row['description'], $ticket_remap);
+		$body = make_body($row['description'], $ticket_remap, $row['id']);
 		$timestamp = date("j M Y H:i e", $row['time']/1000000);
 		$body = '**Reported by ' . convert_username($row['reporter']) . ' on ' . $timestamp . "**\n" . $body;
 		if (!empty($platform) and $platform != "All" and $platform != "Unspecified") {
@@ -450,7 +450,7 @@ function add_changes_for_ticket($ticket, $ticketLabels, $ticket_remap) {
 			} else {
 				$text = '**Modified by ' . convert_username($row['author']) . ' on ' . $timestamp . "**";
 			}
-			$resp = github_add_comment($tickets[$row['ticket']], translate_markup($text, $ticket_remap));
+			$resp = github_add_comment($tickets[$row['ticket']], translate_markup($text, $ticket_remap, $ticket));
 		} else if (in_array($row['field'], array('component', 'priority', 'type', 'resolution', 'severity') )) {
 			if (in_array($labels[strtoupper($row['field'])[0]][crc32($row['oldvalue'])], $ticketLabels)) {
 				$index = array_search($labels[strtoupper($row['field'])[0]][crc32($row['oldvalue'])], $ticketLabels);
@@ -607,11 +607,11 @@ function github_get_labels() {
 	return json_decode(github_req("/repos/$project/$repo/labels?per_page=100", false, false, false), true);
 }
 
-function make_body($description, $ticket_remap) {
-	return empty($description) ? 'None' : translate_markup($description, $ticket_remap);
+function make_body($description, $ticket_remap, $tracid) {
+	return empty($description) ? 'None' : translate_markup($description, $ticket_remap, $tracid);
 }
 
-function translate_markup($data, $ticket_remap = null) {
+function translate_markup($data, $ticket_remap = null, $tracid = null) {
 	// Replace code blocks with an associated language
 	$data = preg_replace('/\{\{\{(\s*#!(\w+))?/m', '```$2', $data);
 	$data = preg_replace('/\}\}\}/', '```', $data);
@@ -663,6 +663,11 @@ function translate_markup($data, $ticket_remap = null) {
 	$data = preg_replace('/G76:(.*)\s*/', 'https://grass.osgeo.org/grass76/manuals/$1.html', $data);
 	$data = preg_replace('/G78:(.*)\s*/', 'https://grass.osgeo.org/grass78/manuals/$1.html', $data);
 	$data = preg_replace('/G7A:(.*)\s*/', 'https://grass.osgeo.org/grass7/manuals/addons/$1.html', $data);
+
+	// wiki/image/source
+	$data = preg_replace('/wiki:([a-zA-Z0-9#\/].*)/', 'https://trac.osgeo.org/grass/wiki/$1', $data);
+	$data = preg_replace('/source:([a-zA-Z0-9#\/].*)/', 'https://trac.osgeo.org/grass/browser/$1', $data);
+	$data = preg_replace('/\[\[Image\(([a-zA-Z0-9-_\.]*)\,?.*\)\]\]/', 'https://trac.osgeo.org/grass/raw-attachment/ticket/' . $tracid . '/$1', $data);
 
 	// Possibly translate other markup as well?
 	return $data;
